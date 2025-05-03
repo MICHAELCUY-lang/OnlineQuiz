@@ -1,19 +1,70 @@
 <project name="OnlineQuiz" default="war" basedir=".">
-    <target name="compile">
-        <mkdir dir="build/classes"/>
-        <javac srcdir="src" destdir="build/classes" includeantruntime="false">
-            <classpath>
-                <fileset dir="lib">
-                    <include name="**/*.jar"/>
-                </fileset>
-            </classpath>
+    <!-- Project properties -->
+    <property name="src.dir" value="src"/>
+    <property name="web.dir" value="WebContent"/>
+    <property name="build.dir" value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="lib.dir" value="${web.dir}/WEB-INF/lib"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="war.file" value="${dist.dir}/OnlineQuiz.war"/>
+    
+    <!-- Classpath for compilation -->
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+        <!-- Include Tomcat's servlet-api.jar if it's not in your lib directory -->
+        <fileset dir="${env.CATALINA_HOME}/lib" erroronmissingdir="false">
+            <include name="servlet-api.jar"/>
+        </fileset>
+    </path>
+    
+    <!-- Clean target - removes build and dist directories -->
+    <target name="clean" description="Cleans the build directories">
+        <delete dir="${build.dir}"/>
+        <delete dir="${dist.dir}"/>
+    </target>
+    
+    <!-- Init target - creates necessary directories -->
+    <target name="init" depends="clean" description="Creates the build directories">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+    
+    <!-- Compile target - compiles Java source files -->
+    <target name="compile" depends="init" description="Compiles Java source files">
+        <javac srcdir="${src.dir}" destdir="${classes.dir}" 
+               debug="true" deprecation="true" includeantruntime="false">
+            <classpath refid="compile.classpath"/>
         </javac>
+        <!-- Copy any non-Java files from src directory -->
+        <copy todir="${classes.dir}">
+            <fileset dir="${src.dir}" excludes="**/*.java"/>
+        </copy>
     </target>
-
-    <target name="war" depends="compile">
-        <war destfile="dist/OnlineQuiz.war" webxml="WebContent/WEB-INF/web.xml">
-            <fileset dir="WebContent"/>
-            <classes dir="build/classes"/>
+    
+    <!-- WAR target - creates the WAR file -->
+    <target name="war" depends="compile" description="Creates the WAR file">
+        <war destfile="${war.file}" webxml="${web.dir}/WEB-INF/web.xml">
+            <!-- Include everything from WebContent directly at the root -->
+            <fileset dir="${web.dir}" excludes="WEB-INF/web.xml"/>
+            <!-- Add compiled classes -->
+            <classes dir="${classes.dir}"/>
+            <!-- Add web.xml -->
+            <webinf dir="${web.dir}/WEB-INF" includes="**/*" excludes="web.xml"/>
         </war>
+        <echo message="WAR file created: ${war.file}"/>
     </target>
+    
+    <!-- Deploy target - copies the WAR file to Tomcat's webapps directory -->
+    <target name="deploy" depends="war" description="Deploys the WAR file to Tomcat">
+        <copy file="${war.file}" todir="${env.CATALINA_HOME}/webapps" 
+              failonerror="false" overwrite="true"/>
+        <echo message="WAR file deployed to Tomcat webapps directory."/>
+    </target>
+    
+    <!-- Default target -->
+    <target name="all" depends="clean,war,deploy" 
+            description="Cleans, compiles, creates WAR file, and deploys"/>
 </project>

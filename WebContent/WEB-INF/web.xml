@@ -7,10 +7,11 @@
     <display-name>Online Quiz Application</display-name>
     
     <welcome-file-list>
-        <welcome-file>Login.jsp</welcome-file>
+        <welcome-file>index.jsp</welcome-file>
+        <welcome-file>login.jsp</welcome-file>
     </welcome-file-list>
     
-    <!-- Servlet Mappings -->
+    <!-- Servlet Definitions -->
     <servlet>
         <servlet-name>LoginServlet</servlet-name>
         <servlet-class>quiz.servlet.LoginServlet</servlet-class>
@@ -27,6 +28,15 @@
     <servlet-mapping>
         <servlet-name>RegisterServlet</servlet-name>
         <url-pattern>/RegisterServlet</url-pattern>
+    </servlet-mapping>
+    
+    <servlet>
+        <servlet-name>LogoutServlet</servlet-name>
+        <servlet-class>quiz.servlet.LogoutServlet</servlet-class>
+    </servlet>
+    <servlet-mapping>
+        <servlet-name>LogoutServlet</servlet-name>
+        <url-pattern>/LogoutServlet</url-pattern>
     </servlet-mapping>
     
     <servlet>
@@ -70,23 +80,19 @@
         <session-timeout>30</session-timeout>
     </session-config>
     
-    <!-- Security Constraints -->
-    <security-constraint>
-        <web-resource-collection>
-            <web-resource-name>Protected Area</web-resource-name>
-            <url-pattern>/admin/*</url-pattern>
-        </web-resource-collection>
-        <auth-constraint>
-            <role-name>admin</role-name>
-        </auth-constraint>
-    </security-constraint>
+    <!-- Error Pages -->
+    <error-page>
+        <error-code>404</error-code>
+        <location>/Error.jsp</location>
+    </error-page>
     
-    <security-role>
-        <role-name>admin</role-name>
-    </security-role>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/Error.jsp</location>
+    </error-page>
     
-    <security-role>
-        <role-name>user</role-name>
-    </security-role>
-    
+    <error-page>
+        <exception-type>java.lang.Exception</exception-type>
+        <location>/Error.jsp</location>
+    </error-page>
 </web-app>
