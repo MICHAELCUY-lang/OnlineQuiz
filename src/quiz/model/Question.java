@@ -1,7 +1,8 @@
-// Question.java
 package quiz.model;
 
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Question {
     private int questionId;
@@ -10,21 +11,21 @@ public class Question {
     private String correctAnswer;
     private int createdBy;
     private Timestamp createdDate;
-    private String subjectName; // For joining with subjects table
+    private List<QuizOption> options;
     
-    // Default constructor
     public Question() {
+        this.options = new ArrayList<>();
     }
     
-    // Parameterized constructor
     public Question(int questionId, int subjectId, String questionText, String correctAnswer, 
-                   int createdBy, Timestamp createdDate) {
+                    int createdBy, Timestamp createdDate) {
         this.questionId = questionId;
         this.subjectId = subjectId;
         this.questionText = questionText;
         this.correctAnswer = correctAnswer;
         this.createdBy = createdBy;
         this.createdDate = createdDate;
+        this.options = new ArrayList<>();
     }
     
     // Getters and Setters
@@ -76,11 +77,28 @@ public class Question {
         this.createdDate = createdDate;
     }
     
-    public String getSubjectName() {
-        return subjectName;
+    public List<QuizOption> getOptions() {
+        return options;
     }
     
-    public void setSubjectName(String subjectName) {
-        this.subjectName = subjectName;
+    public void setOptions(List<QuizOption> options) {
+        this.options = options;
+    }
+    
+    public void addOption(QuizOption option) {
+        this.options.add(option);
+    }
+    
+    @Override
+    public String toString() {
+        return "Question{" +
+                "questionId=" + questionId +
+                ", subjectId=" + subjectId +
+                ", questionText='" + questionText + '\'' +
+                ", correctAnswer='" + correctAnswer + '\'' +
+                ", createdBy=" + createdBy +
+                ", createdDate=" + createdDate +
+                ", options=" + options +
+                '}';
     }
 }

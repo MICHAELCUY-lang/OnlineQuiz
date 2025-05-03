@@ -1,4 +1,3 @@
-// User.java
 package quiz.model;
 
 public class User {
@@ -7,11 +6,9 @@ public class User {
     private String password;
     private boolean isTeacher;
     
-    // Default constructor
     public User() {
     }
     
-    // Parameterized constructor
     public User(int userId, String username, String password, boolean isTeacher) {
         this.userId = userId;
         this.username = username;
@@ -51,9 +48,13 @@ public class User {
     public void setTeacher(boolean isTeacher) {
         this.isTeacher = isTeacher;
     }
+    
+    @Override
+    public String toString() {
+        return "User{" +
+                "userId=" + userId +
+                ", username='" + username + '\'' +
+                ", isTeacher=" + isTeacher +
+                '}';
+    }
 }
-
-
-
-
-

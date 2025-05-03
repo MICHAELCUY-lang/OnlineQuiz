@@ -1,347 +1,225 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.sql.*" %>
-<%@ page import="java.util.*" %>
-<%@ page import="java.text.SimpleDateFormat" %>
-
+<%@ page import="java.util.*, quiz.model.*, quiz.dao.*" %>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>QUIZZEAH! - Score Chart</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        .logo span {
-            color: #e74c3c;
-        }
-        .user-nav {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        .user-nav a {
-            text-decoration: none;
-            color: #2c3e50;
-            font-weight: 500;
-        }
-        .user-nav a:hover {
-            color: #e74c3c;
-        }
-        .username {
-            font-weight: bold;
-            color: #e74c3c;
-        }
-        .scores-container {
-            background-color: white;
-            border-radius: 10px;
-            padding: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-            margin-bottom: 30px;
-        }
-        .page-title {
-            font-size: 24px;
-            color: #2c3e50;
-            margin-bottom: 20px;
-        }
-        .chart-container {
-            width: 100%;
-            height: 400px;
-            margin-bottom: 30px;
-        }
-        .scores-table {
-            width: 100%;
-            border-collapse: collapse;
-        }
-        .scores-table th, .scores-table td {
-            padding: 12px 15px;
-            text-align: left;
-            border-bottom: 1px solid #ecf0f1;
-        }
-        .scores-table th {
-            background-color: #f8f9fa;
-            color: #2c3e50;
-            font-weight: bold;
-        }
-        .scores-table tr:hover {
-            background-color: #f8f9fa;
-        }
-        .score-value {
-            font-weight: bold;
-        }
-        .high-score {
-            color: #27ae60;
-        }
-        .medium-score {
-            color: #f39c12;
-        }
-        .low-score {
-            color: #e74c3c;
-        }
-        .btn {
-            display: inline-block;
-            padding: 10px 25px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .btn-primary {
-            background-color: #e74c3c;
-            color: white;
-        }
-        .btn-primary:hover {
-            background-color: #c0392b;
-        }
-        .error {
-            color: #e74c3c;
-            background-color: #fadbd8;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
-        }
-        .no-data {
-            text-align: center;
-            padding: 30px;
-            color: #7f8c8d;
-            font-style: italic;
-        }
-    </style>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <title>Performance Charts - Online Quiz</title>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <script src="js/chart.js"></script>
 </head>
 <body>
     <%
         // Check if user is logged in
-        String username = (String) session.getAttribute("username");
-        if (username == null) {
+        User user = (User) session.getAttribute("user");
+        if (user == null) {
             response.sendRedirect("Login.jsp");
             return;
         }
         
-        // Get user_id from session
-        Integer userId = (Integer) session.getAttribute("user_id");
-        
-        // If user_id is not in the session, try to get it from the database using username
-        if (userId == null) {
-            Connection tempConn = null;
-            PreparedStatement tempStmt = null;
-            ResultSet tempRs = null;
-            
-            try {
-                Class.forName("com.mysql.cj.jdbc.Driver");
-                tempConn = DriverManager.getConnection("jdbc:mysql://localhost:3306/quiz_db", "root", "");
-                
-                tempStmt = tempConn.prepareStatement("SELECT user_id FROM users WHERE username = ?");
-                tempStmt.setString(1, username);
-                tempRs = tempStmt.executeQuery();
-                
-                if (tempRs.next()) {
-                    userId = tempRs.getInt("user_id");
-                    session.setAttribute("user_id", userId);
-                } else {
-                    response.sendRedirect("Login.jsp");
-                    return;
-                }
-            } catch (Exception e) {
-                response.sendRedirect("Login.jsp");
-                return;
-            } finally {
-                try { if (tempRs != null) tempRs.close(); } catch (Exception e) { }
-                try { if (tempStmt != null) tempStmt.close(); } catch (Exception e) { }
-                try { if (tempConn != null) tempConn.close(); } catch (Exception e) { }
-            }
+        // Get subject scores
+        Map<String, Double> subjectScores = (Map<String, Double>) request.getAttribute("subjectScores");
+        if (subjectScores == null) {
+            ScoreDAO scoreDAO = new ScoreDAO();
+            subjectScores = scoreDAO.getUserScoresBySubject(user.getUserId());
         }
         
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
+        // Get performance data
+        ChartDataDAO chartDataDAO = new ChartDataDAO();
+        List<ChartData> performanceData = chartDataDAO.getChartDataByUser(user.getUserId());
         
-        try {
-            // Database connection
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/quiz_db", "root", "");
-            
-            // Get all scores for this user
-            pstmt = conn.prepareStatement(
-                "SELECT s.score_id, s.total_score, s.date_taken, " +
-                "sub.subject_name, " +
-                "(SELECT COUNT(*) FROM quiz_answers WHERE history_id = s.history_id) AS total_questions " +
-                "FROM scores s " +
-                "JOIN subjects sub ON s.subject_id = sub.subject_id " +
-                "WHERE s.user_id = ? " +
-                "ORDER BY s.date_taken DESC"
-            );
-            pstmt.setInt(1, userId);
-            rs = pstmt.executeQuery();
-            
-            List<Map<String, Object>> scores = new ArrayList<>();
-            while (rs.next()) {
-                Map<String, Object> score = new HashMap<>();
-                score.put("id", rs.getInt("score_id"));
-                score.put("totalScore", rs.getInt("total_score"));
-                score.put("dateTaken", rs.getTimestamp("date_taken"));
-                score.put("subjectName", rs.getString("subject_name"));
-                score.put("totalQuestions", rs.getInt("total_questions"));
-                
-                // Calculate percentage
-                int totalScore = rs.getInt("total_score");
-                int totalQuestions = rs.getInt("total_questions");
-                int percentage = (totalQuestions > 0) ? (totalScore * 100 / totalQuestions) : 0;
-                score.put("percentage", percentage);
-                
-                scores.add(score);
-            }
-            
-            // Format date for display
-            SimpleDateFormat dateFormat = new SimpleDateFormat("dd MMM yyyy, HH:mm");
-            
-            // Prepare chart data
-            List<String> labels = new ArrayList<>();
-            List<Integer> data = new ArrayList<>();
-            
-            for (int i = Math.min(scores.size() - 1, 9); i >= 0; i--) {
-                Map<String, Object> score = scores.get(i);
-                labels.add("'" + score.get("subjectName") + "'");
-                data.add((Integer) score.get("percentage"));
-            }
+        // Get scores by date for trend chart
+        ScoreDAO scoreDAO = new ScoreDAO();
+        List<Score> scores = scoreDAO.getScoresByUser(user.getUserId());
     %>
     
+    <header>
+        <div class="container">
+            <div class="logo">Online Quiz</div>
+            <nav>
+                <ul>
+                    <li><a href="DashboardServlet">Dashboard</a></li>
+                    <li><a href="QuizServlet">Take Quiz</a></li>
+                    <li><a href="ScoreServlet">View Scores</a></li>
+                    <li><a href="ScoreServlet?action=chart">Performance Charts</a></li>
+                    <li><a href="Login.jsp">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
     <div class="container">
-        <div class="header">
-            <div class="logo">QUIZZEAH! <span>✍(ᴗ‿ᴗ)</span></div>
-            <div class="user-nav">
-                <a href="Dashboard.jsp">Home</a>
-                <a href="ScoreChart.jsp">Score</a>
-                <a href="QuestionChart.jsp">Question Chart</a>
-                <span class="username"><%= username %></span>
-                <a href="Logout.jsp">Logout</a>
+        <h1>Performance Charts</h1>
+        
+        <div class="card">
+            <div class="card-header">Performance by Subject</div>
+            <div class="card-body">
+                <% if (subjectScores.isEmpty()) { %>
+                    <p>No data available. Take some quizzes to see your performance.</p>
+                <% } else { %>
+                    <div class="chart-container">
+                        <canvas id="subjectChart"></canvas>
+                    </div>
+                    
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const data = [];
+                            const labels = [];
+                            
+                            <% for (Map.Entry<String, Double> entry : subjectScores.entrySet()) { %>
+                                data.push(<%= entry.getValue() %>);
+                                labels.push('<%= entry.getKey() %>');
+                            <% } %>
+                            
+                            createBarChart('subjectChart', data, labels, 'Average Score by Subject', 'Score');
+                        });
+                    </script>
+                <% } %>
             </div>
         </div>
         
-        <div class="scores-container">
-            <h2 class="page-title">Your Quiz Performance</h2>
-            
-            <% if (scores.isEmpty()) { %>
-                <div class="no-data">You haven't taken any quizzes yet. Go to the dashboard to start!</div>
-            <% } else { %>
-                <div class="chart-container">
-                    <canvas id="scoresChart"></canvas>
-                </div>
-                
-                <table class="scores-table">
-                    <thead>
-                        <tr>
-                            <th>Subject</th>
-                            <th>Score</th>
-                            <th>Percentage</th>
-                            <th>Date</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <% for (Map<String, Object> score : scores) { 
-                            int percentage = (Integer) score.get("percentage");
-                            String scoreClass = "";
-                            if (percentage >= 80) {
-                                scoreClass = "high-score";
-                            } else if (percentage >= 60) {
-                                scoreClass = "medium-score";
-                            } else {
-                                scoreClass = "low-score";
+        <div class="card">
+            <div class="card-header">Performance Distribution</div>
+            <div class="card-body">
+                <% if (subjectScores.isEmpty()) { %>
+                    <p>No data available. Take some quizzes to see your performance.</p>
+                <% } else { %>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                    
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            const data = [];
+                            const labels = [];
+                            
+                            <% for (Map.Entry<String, Double> entry : subjectScores.entrySet()) { %>
+                                data.push(<%= entry.getValue() %>);
+                                labels.push('<%= entry.getKey() %>');
+                            <% } %>
+                            
+                            createPieChart('pieChart', data, labels, 'Score Distribution by Subject');
+                        });
+                    </script>
+                <% } %>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">Performance Trend</div>
+            <div class="card-body">
+                <% if (scores.isEmpty()) { %>
+                    <p>No data available. Take some quizzes to see your performance trend.</p>
+                <% } else { %>
+                    <div class="chart-container">
+                        <canvas id="trendChart"></canvas>
+                    </div>
+                    
+                    <script>
+                        document.addEventListener('DOMContentLoaded', function() {
+                            // Group scores by subject
+                            const scoresBySubject = {};
+                            
+                            <% 
+                                SubjectDAO subjectDAO = new SubjectDAO();
+                                Map<Integer, List<Score>> scoresBySubjectId = new HashMap<>();
+                                
+                                for (Score score : scores) {
+                                    if (score.getSubjectId() != null) {
+                                        List<Score> subjectScores = scoresBySubjectId.getOrDefault(score.getSubjectId(), new ArrayList<>());
+                                        subjectScores.add(score);
+                                        scoresBySubjectId.put(score.getSubjectId(), subjectScores);
+                                    }
+                                }
+                                
+                                for (Map.Entry<Integer, List<Score>> entry : scoresBySubjectId.entrySet()) {
+                                    Subject subject = subjectDAO.getSubjectById(entry.getKey());
+                                    if (subject != null) {
+                                        String subjectName = subject.getSubjectName();
+                            %>
+                                scoresBySubject['<%= subjectName %>'] = [
+                                    <% for (Score score : entry.getValue()) { %>
+                                        <%= score.getTotalScore() %>,
+                                    <% } %>
+                                ];
+                            <% 
+                                    }
+                                }
+                            %>
+                            
+                            const datasets = [];
+                            const colors = [
+                                '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                                '#FF9F40', '#C9CBCF', '#7CFC00', '#00CED1', '#FF7F50'
+                            ];
+                            
+                            let colorIndex = 0;
+                            for (const subject in scoresBySubject) {
+                                datasets.push({
+                                    label: subject,
+                                    data: scoresBySubject[subject],
+                                    borderColor: colors[colorIndex % colors.length],
+                                    backgroundColor: 'transparent',
+                                    pointBackgroundColor: colors[colorIndex % colors.length],
+                                    pointRadius: 5
+                                });
+                                colorIndex++;
                             }
-                        %>
-                            <tr>
-                                <td><%= score.get("subjectName") %></td>
-                                <td><%= score.get("totalScore") %>/<%= score.get("totalQuestions") %></td>
-                                <td class="score-value <%= scoreClass %>"><%= percentage %>%</td>
-                                <td><%= dateFormat.format((Timestamp) score.get("dateTaken")) %></td>
-                            </tr>
-                        <% } %>
-                    </tbody>
-                </table>
-            <% } %>
+                            
+                            const ctx = document.getElementById('trendChart').getContext('2d');
+                            new Chart(ctx, {
+                                type: 'line',
+                                data: {
+                                    labels: Array.from({ length: Math.max(...Object.values(scoresBySubject).map(arr => arr.length)) }, (_, i) => i + 1),
+                                    datasets: datasets
+                                },
+                                options: {
+                                    responsive: true,
+                                    maintainAspectRatio: false,
+                                    title: {
+                                        display: true,
+                                        text: 'Score Trend by Subject',
+                                        fontSize: 16
+                                    },
+                                    scales: {
+                                        yAxes: [{
+                                            ticks: {
+                                                beginAtZero: true
+                                            },
+                                            scaleLabel: {
+                                                display: true,
+                                                labelString: 'Score'
+                                            }
+                                        }],
+                                        xAxes: [{
+                                            scaleLabel: {
+                                                display: true,
+                                                labelString: 'Quiz Number'
+                                            }
+                                        }]
+                                    },
+                                    legend: {
+                                        position: 'bottom'
+                                    }
+                                }
+                            });
+                        });
+                    </script>
+                <% } %>
+            </div>
+        </div>
+        
+        <div class="action-buttons">
+            <a href="ScoreServlet" class="btn">View Score History</a>
+            <a href="DashboardServlet" class="btn">Back to Dashboard</a>
         </div>
     </div>
     
-    <% if (!scores.isEmpty()) { %>
-    <script>
-        // Create chart
-        var ctx = document.getElementById('scoresChart').getContext('2d');
-        var myChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: [<%= String.join(", ", labels) %>],
-                datasets: [{
-                    label: 'Score Percentage',
-                    data: [<%= data.stream().map(Object::toString).reduce((a, b) -> a + ", " + b).orElse("") %>],
-                    backgroundColor: '#e74c3c',
-                    borderColor: '#c0392b',
-                    borderWidth: 1
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                scales: {
-                    y: {
-                        beginAtZero: true,
-                        max: 100,
-                        title: {
-                            display: true,
-                            text: 'Percentage'
-                        }
-                    },
-                    x: {
-                        title: {
-                            display: true,
-                            text: 'Subject'
-                        }
-                    }
-                },
-                plugins: {
-                    title: {
-                        display: true,
-                        text: 'Your Recent Quiz Scores',
-                        font: {
-                            size: 18
-                        }
-                    }
-                }
-            }
-        });
-    </script>
-    <% } %>
-    
-    <%
-        } catch (Exception e) {
-            out.println("<div class='error'>Error: " + e.getMessage() + "</div>");
-            e.printStackTrace();
-        } finally {
-            try { if (rs != null) rs.close(); } catch (Exception e) { }
-            try { if (pstmt != null) pstmt.close(); } catch (Exception e) { }
-            try { if (conn != null) conn.close(); } catch (Exception e) { }
-        }
-    %>
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Online Quiz. All rights reserved.</p>
+        </div>
+    </footer>
 </body>
 </html>

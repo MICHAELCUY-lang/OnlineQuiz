@@ -1,4 +1,3 @@
-// Score.java
 package quiz.model;
 
 import java.sql.Timestamp;
@@ -9,16 +8,12 @@ public class Score {
     private int historyId;
     private int totalScore;
     private Timestamp dateTaken;
-    private int subjectId;
-    private String username; // For joining with users table
-    private String subjectName; // For joining with subjects table
+    private Integer subjectId;
     
-    // Default constructor
     public Score() {
     }
     
-    // Parameterized constructor
-    public Score(int scoreId, int userId, int historyId, int totalScore, Timestamp dateTaken, int subjectId) {
+    public Score(int scoreId, int userId, int historyId, int totalScore, Timestamp dateTaken, Integer subjectId) {
         this.scoreId = scoreId;
         this.userId = userId;
         this.historyId = historyId;
@@ -68,27 +63,23 @@ public class Score {
         this.dateTaken = dateTaken;
     }
     
-    public int getSubjectId() {
+    public Integer getSubjectId() {
         return subjectId;
     }
     
-    public void setSubjectId(int subjectId) {
+    public void setSubjectId(Integer subjectId) {
         this.subjectId = subjectId;
     }
     
-    public String getUsername() {
-        return username;
-    }
-    
-    public void setUsername(String username) {
-        this.username = username;
-    }
-    
-    public String getSubjectName() {
-        return subjectName;
-    }
-    
-    public void setSubjectName(String subjectName) {
-        this.subjectName = subjectName;
+    @Override
+    public String toString() {
+        return "Score{" +
+                "scoreId=" + scoreId +
+                ", userId=" + userId +
+                ", historyId=" + historyId +
+                ", totalScore=" + totalScore +
+                ", dateTaken=" + dateTaken +
+                ", subjectId=" + subjectId +
+                '}';
     }
 }

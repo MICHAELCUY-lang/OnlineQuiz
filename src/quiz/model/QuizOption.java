@@ -1,4 +1,3 @@
-// QuizOption.java
 package quiz.model;
 
 public class QuizOption {
@@ -7,11 +6,9 @@ public class QuizOption {
     private String optionText;
     private boolean isCorrect;
     
-    // Default constructor
     public QuizOption() {
     }
     
-    // Parameterized constructor
     public QuizOption(int quizId, int questionId, String optionText, boolean isCorrect) {
         this.quizId = quizId;
         this.questionId = questionId;
@@ -50,5 +47,15 @@ public class QuizOption {
     
     public void setCorrect(boolean isCorrect) {
         this.isCorrect = isCorrect;
+    }
+    
+    @Override
+    public String toString() {
+        return "QuizOption{" +
+                "quizId=" + quizId +
+                ", questionId=" + questionId +
+                ", optionText='" + optionText + '\'' +
+                ", isCorrect=" + isCorrect +
+                '}';
     }
 }

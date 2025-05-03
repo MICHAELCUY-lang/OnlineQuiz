@@ -1,140 +1,99 @@
-<!-- score.jsp -->
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="quiz.model.User, quiz.model.Score, java.util.List" %>
+<%@ page import="java.util.*, quiz.model.*, quiz.dao.*" %>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>Online Quiz - Scores</title>
+    <title>Your Scores - Online Quiz</title>
     <link rel="stylesheet" type="text/css" href="css/style.css">
-    <script src="js/chart.js"></script>
 </head>
 <body>
-    <% 
+    <%
+        // Check if user is logged in
         User user = (User) session.getAttribute("user");
         if (user == null) {
-            response.sendRedirect("login.jsp");
+            response.sendRedirect("Login.jsp");
             return;
         }
         
-        @SuppressWarnings("unchecked")
+        // Get scores
         List<Score> scores = (List<Score>) request.getAttribute("scores");
-        
-        @SuppressWarnings("unchecked")
-        List<Object[]> chartData = (List<Object[]>) request.getAttribute("chartData");
+        if (scores == null) {
+            ScoreDAO scoreDAO = new ScoreDAO();
+            scores = scoreDAO.getScoresByUser(user.getUserId());
+        }
     %>
-
-    <div class="container">
-        <div class="header">
-            <h1>Online Quiz System</h1>
-            <div class="user-info">
-                <%= user.getUsername() %> | <a href="login.jsp">Logout</a>
-            </div>
+    
+    <header>
+        <div class="container">
+            <div class="logo">Online Quiz</div>
+            <nav>
+                <ul>
+                    <li><a href="DashboardServlet">Dashboard</a></li>
+                    <li><a href="QuizServlet">Take Quiz</a></li>
+                    <li><a href="ScoreServlet">View Scores</a></li>
+                    <li><a href="ScoreServlet?action=chart">Performance Charts</a></li>
+                    <li><a href="Login.jsp">Logout</a></li>
+                </ul>
+            </nav>
         </div>
+    </header>
+    
+    <div class="container">
+        <h1>Your Scores</h1>
         
-        <div class="content-box">
-            <h2>Quiz Scores</h2>
-            
-            <div class="dashboard-menu">
-                <a href="dashboard.jsp" class="btn btn-secondary">Back to Dashboard</a>
-            </div>
-            
-            <% if(scores != null && !scores.isEmpty()) { %>
-                <div class="scores-list">
-                    <table class="data-table">
+        <div class="card">
+            <div class="card-header">Score History</div>
+            <div class="card-body">
+                <% if (scores.isEmpty()) { %>
+                    <p>No quizzes taken yet.</p>
+                <% } else { %>
+                    <table class="table">
                         <thead>
                             <tr>
+                                <th>Date</th>
                                 <th>Subject</th>
                                 <th>Score</th>
-                                <th>Date Taken</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <% for(Score score : scores) { %>
-                                <tr>
-                                    <td><%= score.getSubjectName() != null ? score.getSubjectName() : "N/A" %></td>
-                                    <td><%= score.getTotalScore() %></td>
-                                    <td><%= score.getDateTaken() %></td>
-                                </tr>
+                            <% 
+                                SubjectDAO subjectDAO = new SubjectDAO();
+                                for (Score score : scores) {
+                                    String subjectName = "N/A";
+                                    if (score.getSubjectId() != null) {
+                                        Subject subject = subjectDAO.getSubjectById(score.getSubjectId());
+                                        if (subject != null) {
+                                            subjectName = subject.getSubjectName();
+                                        }
+                                    }
+                            %>
+                            <tr>
+                                <td><%= score.getDateTaken() %></td>
+                                <td><%= subjectName %></td>
+                                <td><%= score.getTotalScore() %></td>
+                                <td>
+                                    <a href="ScoreServlet?action=detail&scoreId=<%= score.getScoreId() %>" class="btn btn-primary">View Details</a>
+                                </td>
+                            </tr>
                             <% } %>
                         </tbody>
                     </table>
+                <% } %>
+                
+                <div class="action-buttons">
+                    <a href="QuizServlet" class="btn btn-primary">Take New Quiz</a>
+                    <a href="ScoreServlet?action=chart" class="btn">View Performance Charts</a>
                 </div>
-            <% } else { %>
-                <div class="no-data-message">
-                    <p>You haven't taken any quizzes yet.</p>
-                </div>
-            <% } %>
-            
-            <!-- Performance Chart Section -->
-            <% if(chartData != null && !chartData.isEmpty()) { %>
-                <div class="chart-section">
-                    <h3>Performance by Subject</h3>
-                    <div class="chart-container">
-                        <canvas id="performanceChart"></canvas>
-                    </div>
-                    
-                    <script>
-                        // Set up chart data
-                        var ctx = document.getElementById('performanceChart').getContext('2d');
-                        var chartLabels = [
-                            <% 
-                            for(int i = 0; i < chartData.size(); i++) { 
-                                Object[] data = chartData.get(i);
-                                String subject = (String) data[0];
-                                if(i > 0) out.print(", ");
-                                out.print("'" + subject + "'");
-                            } 
-                            %>
-                        ];
-                        
-                        var chartValues = [
-                            <% 
-                            for(int i = 0; i < chartData.size(); i++) { 
-                                Object[] data = chartData.get(i);
-                                Float value = (Float) data[1];
-                                if(i > 0) out.print(", ");
-                                out.print(value);
-                            } 
-                            %>
-                        ];
-                        
-                        // Create chart
-                        var myChart = new Chart(ctx, {
-                            type: 'pie',
-                            data: {
-                                labels: chartLabels,
-                                datasets: [{
-                                    data: chartValues,
-                                    backgroundColor: [
-                                        'rgba(255, 99, 132, 0.7)',
-                                        'rgba(54, 162, 235, 0.7)',
-                                        'rgba(255, 206, 86, 0.7)',
-                                        'rgba(75, 192, 192, 0.7)',
-                                        'rgba(153, 102, 255, 0.7)'
-                                    ],
-                                    borderColor: [
-                                        'rgba(255, 99, 132, 1)',
-                                        'rgba(54, 162, 235, 1)',
-                                        'rgba(255, 206, 86, 1)',
-                                        'rgba(75, 192, 192, 1)',
-                                        'rgba(153, 102, 255, 1)'
-                                    ],
-                                    borderWidth: 1
-                                }]
-                            },
-                            options: {
-                                responsive: true,
-                                title: {
-                                    display: true,
-                                    text: 'Performance by Subject (%)'
-                                }
-                            }
-                        });
-                    </script>
-                </div>
-            <% } %>
+            </div>
         </div>
     </div>
+    
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Online Quiz. All rights reserved.</p>
+        </div>
+    </footer>
 </body>
 </html>

@@ -1,223 +1,206 @@
 <%@ page language="java" contentType="text/html; charset=UTF-8" pageEncoding="UTF-8"%>
-<%@ page import="java.sql.*" %>
-<%@ page import="java.util.*" %>
-
+<%@ page import="java.util.*, quiz.model.*, quiz.dao.*" %>
 <!DOCTYPE html>
 <html>
 <head>
     <meta charset="UTF-8">
-    <title>QUIZZEAH! - Dashboard</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #f5f5f5;
-            color: #333;
-        }
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 20px;
-        }
-        .header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        .logo {
-            font-size: 28px;
-            font-weight: bold;
-            color: #2c3e50;
-        }
-        .logo span {
-            color: #e74c3c;
-        }
-        .user-nav {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-        .user-nav a {
-            text-decoration: none;
-            color: #2c3e50;
-            font-weight: 500;
-        }
-        .user-nav a:hover {
-            color: #e74c3c;
-        }
-        .username {
-            font-weight: bold;
-            color: #e74c3c;
-        }
-        .welcome {
-            background-color: white;
-            padding: 20px;
-            border-radius: 10px;
-            margin-bottom: 30px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .welcome h1 {
-            margin: 0;
-            font-size: 24px;
-            color: #2c3e50;
-        }
-        .welcome p {
-            margin: 10px 0 0;
-            color: #7f8c8d;
-        }
-        .quiz-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-        }
-        .quiz-card {
-            background-color: white;
-            border-radius: 10px;
-            padding: 20px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .quiz-title {
-            font-size: 20px;
-            font-weight: bold;
-            margin: 0 0 10px;
-            color: #2c3e50;
-        }
-        .quiz-meta {
-            color: #7f8c8d;
-            margin-bottom: 15px;
-            font-size: 14px;
-        }
-        .quiz-meta div {
-            margin-bottom: 5px;
-        }
-        .attempt-btn {
-            display: inline-block;
-            background-color: #e74c3c;
-            color: white;
-            padding: 8px 20px;
-            border-radius: 5px;
-            text-decoration: none;
-            font-weight: bold;
-            transition: background-color 0.3s;
-        }
-        .attempt-btn:hover {
-            background-color: #c0392b;
-        }
-    </style>
+    <title>Dashboard - Online Quiz</title>
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@2.9.4/dist/Chart.min.js"></script>
+    <script src="js/chart.js"></script>
 </head>
 <body>
     <%
         // Check if user is logged in
-        String username = (String) session.getAttribute("username");
-        if (username == null) {
+        User user = (User) session.getAttribute("user");
+        if (user == null) {
             response.sendRedirect("Login.jsp");
             return;
         }
         
-        Connection conn = null;
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
+        // Get performance data
+        List<ChartData> performanceData = (List<ChartData>) request.getAttribute("performanceData");
+        Map<String, Double> subjectScores = (Map<String, Double>) request.getAttribute("subjectScores");
         
-        try {
-            // Database connection
-            Class.forName("com.mysql.cj.jdbc.Driver");
-            conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/quiz_db", "root", "");
-            
-            // Get subjects
-            pstmt = conn.prepareStatement("SELECT subject_id, subject_name, description FROM subjects ORDER BY subject_name");
-            rs = pstmt.executeQuery();
-            
-            List<Map<String, Object>> subjects = new ArrayList<>();
-            while (rs.next()) {
-                Map<String, Object> subject = new HashMap<>();
-                subject.put("id", rs.getInt("subject_id"));
-                subject.put("name", rs.getString("subject_name"));
-                subject.put("description", rs.getString("description"));
-                subjects.add(subject);
-            }
+        // Get subjects for the quiz selector
+        List<Subject> subjects = (List<Subject>) request.getAttribute("subjects");
+        
+        // Get recent scores
+        ScoreDAO scoreDAO = new ScoreDAO();
+        List<Score> recentScores = scoreDAO.getScoresByUser(user.getUserId());
+        if (recentScores.size() > 5) {
+            recentScores = recentScores.subList(0, 5);
+        }
     %>
-
-
-<div class="header">
-    <div class="logo">QUIZZEAH! <span>✍(ᴗ‿ᴗ)</span></div>
-    <div class="user-nav">
-        <a href="Dashboard.jsp">Home</a>
-        <a href="ScoreChart.jsp">Score</a>
-        <a href="QuestionChart.jsp">Question Chart</a>
-        <% 
-        Boolean isTeacher = (Boolean) session.getAttribute("is_teacher");
-        if (isTeacher != null && isTeacher) { 
-        %>
-            <a href="AdminPage.jsp">Admin</a>
-        <% } %>
-        <span class="username"><%= username %></span>
-        <a href="Logout.jsp">Logout</a>
-    </div>
-</div>
+    
+    <header>
+        <div class="container">
+            <div class="logo">Online Quiz</div>
+            <nav>
+                <ul>
+                    <li><a href="DashboardServlet">Dashboard</a></li>
+                    <li><a href="QuizServlet">Take Quiz</a></li>
+                    <li><a href="ScoreServlet">View Scores</a></li>
+                    <li><a href="ScoreServlet?action=chart">Performance Charts</a></li>
+                    <li><a href="Login.jsp">Logout</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+    
+    <div class="container">
+        <h1>Welcome, <%= user.getUsername() %>!</h1>
         
-        <div class="welcome">
-            <h1>Hello dear user!</h1>
-            <p>Ready for the test? Keep it up my sweetheart, choose which one you wanna take</p>
+        <div class="dashboard-stats">
+            <div class="stat-card">
+                <div class="stat-value">
+                    <%= recentScores.size() %>
+                </div>
+                <div class="stat-label">Quizzes Taken</div>
+            </div>
+            
+            <%
+                double avgScore = 0;
+                int totalScores = 0;
+                
+                for (Score score : recentScores) {
+                    avgScore += score.getTotalScore();
+                    totalScores++;
+                }
+                
+                if (totalScores > 0) {
+                    avgScore = avgScore / totalScores;
+                }
+            %>
+            
+            <div class="stat-card">
+                <div class="stat-value">
+                    <%= String.format("%.1f", avgScore) %>
+                </div>
+                <div class="stat-label">Average Score</div>
+            </div>
+            
+            <%
+                int bestScore = 0;
+                String bestSubject = "N/A";
+                
+                for (Map.Entry<String, Double> entry : subjectScores.entrySet()) {
+                    if (entry.getValue() > bestScore) {
+                        bestScore = entry.getValue().intValue();
+                        bestSubject = entry.getKey();
+                    }
+                }
+            %>
+            
+            <div class="stat-card">
+                <div class="stat-value">
+                    <%= bestSubject %>
+                </div>
+                <div class="stat-label">Best Subject</div>
+            </div>
         </div>
         
-        <div class="quiz-grid">
-            <% for (Map<String, Object> subject : subjects) { %>
-                <div class="quiz-card">
-                    <h3 class="quiz-title"><%= subject.get("name") %></h3>
-                    <div class="quiz-meta">
-                        <div>70 questions</div>
-                        <div>2 hours 30 minutes</div>
-                        <div>Open book</div>
-                    </div>
-                    <a href="Quiz.jsp?subject_id=<%= subject.get("id") %>" class="attempt-btn">Attempt</a>
+        <div class="row">
+            <div class="card">
+                <div class="card-header">Start a New Quiz</div>
+                <div class="card-body">
+                    <form action="QuizServlet" method="get">
+                        <input type="hidden" name="action" value="start">
+                        
+                        <div class="form-group">
+                            <label for="subjectId">Select Subject:</label>
+                            <select id="subjectId" name="subjectId" required>
+                                <% for (Subject subject : subjects) { %>
+                                    <option value="<%= subject.getSubjectId() %>"><%= subject.getSubjectName() %></option>
+                                <% } %>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="numQuestions">Number of Questions:</label>
+                            <select id="numQuestions" name="numQuestions">
+                                <option value="5">5</option>
+                                <option value="10">10</option>
+                                <option value="15">15</option>
+                                <option value="20">20</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <button type="submit" class="btn btn-primary">Start Quiz</button>
+                        </div>
+                    </form>
                 </div>
-            <% } %>
-            
-            <!-- Additional cards to match the Figma design -->
-            <div class="quiz-card">
-                <h3 class="quiz-title">Math</h3>
-                <div class="quiz-meta">
-                    <div>70 questions</div>
-                    <div>2 hours 30 minutes</div>
-                    <div>Open book</div>
-                </div>
-                <a href="#" class="attempt-btn">Attempt</a>
             </div>
             
-            <div class="quiz-card">
-                <h3 class="quiz-title">Math</h3>
-                <div class="quiz-meta">
-                    <div>70 questions</div>
-                    <div>2 hours 30 minutes</div>
-                    <div>Open book</div>
+            <div class="card">
+                <div class="card-header">Recent Scores</div>
+                <div class="card-body">
+                    <% if (recentScores.isEmpty()) { %>
+                        <p>No quizzes taken yet.</p>
+                    <% } else { %>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Subject</th>
+                                    <th>Score</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <% 
+                                    SubjectDAO subjectDAO = new SubjectDAO();
+                                    for (Score score : recentScores) {
+                                        String subjectName = "N/A";
+                                        if (score.getSubjectId() != null) {
+                                            Subject subject = subjectDAO.getSubjectById(score.getSubjectId());
+                                            if (subject != null) {
+                                                subjectName = subject.getSubjectName();
+                                            }
+                                        }
+                                %>
+                                <tr>
+                                    <td><%= score.getDateTaken() %></td>
+                                    <td><%= subjectName %></td>
+                                    <td><%= score.getTotalScore() %></td>
+                                </tr>
+                                <% } %>
+                            </tbody>
+                        </table>
+                        <a href="ScoreServlet" class="btn">View All Scores</a>
+                    <% } %>
                 </div>
-                <a href="#" class="attempt-btn">Attempt</a>
             </div>
-            
-            <div class="quiz-card">
-                <h3 class="quiz-title">Math</h3>
-                <div class="quiz-meta">
-                    <div>70 questions</div>
-                    <div>2 hours 30 minutes</div>
-                    <div>Open book</div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">Performance by Subject</div>
+            <div class="card-body">
+                <div class="chart-container">
+                    <canvas id="performanceChart"></canvas>
                 </div>
-                <a href="#" class="attempt-btn">Attempt</a>
+                
+                <script>
+                    document.addEventListener('DOMContentLoaded', function() {
+                        const data = [];
+                        const labels = [];
+                        
+                        <% for (Map.Entry<String, Double> entry : subjectScores.entrySet()) { %>
+                            data.push(<%= entry.getValue() %>);
+                            labels.push('<%= entry.getKey() %>');
+                        <% } %>
+                        
+                        createBarChart('performanceChart', data, labels, 'Average Score by Subject', 'Score');
+                    });
+                </script>
             </div>
         </div>
     </div>
     
-    <%
-        } catch (Exception e) {
-            out.println("<div class='error'>Error: " + e.getMessage() + "</div>");
-            e.printStackTrace();
-        } finally {
-            try { if (rs != null) rs.close(); } catch (Exception e) { }
-            try { if (pstmt != null) pstmt.close(); } catch (Exception e) { }
-            try { if (conn != null) conn.close(); } catch (Exception e) { }
-        }
-    %>
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Online Quiz. All rights reserved.</p>
+        </div>
+    </footer>
 </body>
 </html>

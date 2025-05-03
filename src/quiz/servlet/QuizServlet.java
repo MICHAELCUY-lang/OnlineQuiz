@@ -1,10 +1,7 @@
-// QuizServlet.java
 package quiz.servlet;
 
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import quiz.dao.*;
+import quiz.model.*;
 
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
@@ -12,159 +9,150 @@ import javax.servlet.http.HttpServlet;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.servlet.http.HttpSession;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
-import quiz.dao.QuestionDAO;
-import quiz.dao.QuizDAO;
-import quiz.dao.ScoreDAO;
-import quiz.model.Question;
-import quiz.model.QuizOption;
-import quiz.model.Score;
-import quiz.model.User;
-
-@WebServlet("/quiz")
+@WebServlet("/QuizServlet")
 public class QuizServlet extends HttpServlet {
     private static final long serialVersionUID = 1L;
     
     protected void doGet(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        
         HttpSession session = request.getSession();
         User user = (User) session.getAttribute("user");
         
         if (user == null) {
-            response.sendRedirect("login.jsp");
+            response.sendRedirect("Login.jsp");
             return;
         }
         
-        // Get subject ID from request
-        int subjectId = 0;
-        try {
-            subjectId = Integer.parseInt(request.getParameter("subjectId"));
-        } catch (NumberFormatException e) {
-            // If no subject specified, use default (1 - Mathematics)
-            subjectId = 1;
+        String action = request.getParameter("action");
+        
+        if (action == null) {
+            // Show subject selection
+            SubjectDAO subjectDAO = new SubjectDAO();
+            List<Subject> subjects = subjectDAO.getAllSubjects();
+            request.setAttribute("subjects", subjects);
+            request.getRequestDispatcher("Quiz.jsp").forward(request, response);
+        } else if (action.equals("start")) {
+            // Start a new quiz
+            int subjectId = Integer.parseInt(request.getParameter("subjectId"));
+            int numQuestions = Integer.parseInt(request.getParameter("numQuestions"));
+            
+            QuestionDAO questionDAO = new QuestionDAO();
+            List<Question> questions = questionDAO.getRandomQuestions(subjectId, numQuestions);
+            
+            if (questions.isEmpty()) {
+                request.setAttribute("errorMessage", "No questions available for this subject");
+                response.sendRedirect("Quiz.jsp");
+                return;
+            }
+            
+            // Create a new quiz history
+            QuizHistory history = new QuizHistory();
+            history.setUserId(user.getUserId());
+            
+            QuizHistoryDAO historyDAO = new QuizHistoryDAO();
+            boolean success = historyDAO.createQuizHistory(history);
+            
+            if (success) {
+                session.setAttribute("quizHistory", history);
+                session.setAttribute("questions", questions);
+                session.setAttribute("currentQuestionIndex", 0);
+                session.setAttribute("selectedAnswers", new ArrayList<QuizAnswer>());
+                
+                response.sendRedirect("QuizQuestion.jsp");
+            } else {
+                request.setAttribute("errorMessage", "Failed to start quiz");
+                response.sendRedirect("Quiz.jsp");
+            }
         }
-        
-        // Get questions for the selected subject
-        QuestionDAO questionDAO = new QuestionDAO();
-        List<Question> questions = questionDAO.getQuestionsBySubject(subjectId);
-        
-        // Shuffle questions for randomization
-        Collections.shuffle(questions);
-        
-        // Limit to 10 questions or less if not enough available
-        int questionsCount = Math.min(10, questions.size());
-        List<Question> quizQuestions = questions.subList(0, questionsCount);
-        
-        // Get options for each question
-        QuizDAO quizDAO = new QuizDAO();
-        for (Question question : quizQuestions) {
-            List<QuizOption> options = quizDAO.getOptionsForQuestion(question.getQuestionId());
-            // Store options in session with question ID as key
-            session.setAttribute("options_" + question.getQuestionId(), options);
-        }
-        
-        // Create quiz history
-        int historyId = quizDAO.createQuizHistory(user.getUserId());
-        session.setAttribute("historyId", historyId);
-        session.setAttribute("subjectId", subjectId);
-        
-        // Store questions in session
-        session.setAttribute("quizQuestions", quizQuestions);
-        session.setAttribute("currentQuestionIndex", 0);
-        
-        // Forward to quiz page
-        response.sendRedirect("quiz.jsp");
     }
     
     protected void doPost(HttpServletRequest request, HttpServletResponse response) 
             throws ServletException, IOException {
-        
         HttpSession session = request.getSession();
         User user = (User) session.getAttribute("user");
         
         if (user == null) {
-            response.sendRedirect("login.jsp");
+            response.sendRedirect("Login.jsp");
             return;
         }
         
-        // Get current question index and history ID
-        int currentQuestionIndex = (int) session.getAttribute("currentQuestionIndex");
-        int historyId = (int) session.getAttribute("historyId");
-        int subjectId = (int) session.getAttribute("subjectId");
+        String action = request.getParameter("action");
         
-        // Get quiz questions
-        @SuppressWarnings("unchecked")
-        List<Question> quizQuestions = (List<Question>) session.getAttribute("quizQuestions");
-        
-        // Get selected answer
-        String selectedOption = request.getParameter("selectedOption");
-        int selectedOptionId = Integer.parseInt(selectedOption);
-        
-        // Get current question
-        Question currentQuestion = quizQuestions.get(currentQuestionIndex);
-        
-        // Check if answer is correct
-        QuizDAO quizDAO = new QuizDAO();
-        @SuppressWarnings("unchecked")
-        List<QuizOption> options = (List<QuizOption>) session.getAttribute("options_" + currentQuestion.getQuestionId());
-        
-        boolean isCorrect = false;
-        for (QuizOption option : options) {
-            if (option.getQuizId() == selectedOptionId && option.isCorrect()) {
-                isCorrect = true;
-                break;
+        if (action != null && action.equals("submitAnswer")) {
+            // Get quiz session data
+            QuizHistory history = (QuizHistory) session.getAttribute("quizHistory");
+            List<Question> questions = (List<Question>) session.getAttribute("questions");
+            int currentIndex = (int) session.getAttribute("currentQuestionIndex");
+            List<QuizAnswer> selectedAnswers = (List<QuizAnswer>) session.getAttribute("selectedAnswers");
+            
+            // Get current question and selected answer
+            Question currentQuestion = questions.get(currentIndex);
+            int selectedOptionId = Integer.parseInt(request.getParameter("optionId"));
+            
+            // Check if answer is correct
+            boolean isCorrect = false;
+            for (QuizOption option : currentQuestion.getOptions()) {
+                if (option.getQuizId() == selectedOptionId && option.isCorrect()) {
+                    isCorrect = true;
+                    break;
+                }
             }
-        }
-        
-        // Record answer
-        quizDAO.recordQuizAnswer(historyId, currentQuestion.getQuestionId(), selectedOptionId, isCorrect);
-        
-        // Update score
-        Integer totalScore = (Integer) session.getAttribute("totalScore");
-        if (totalScore == null) {
-            totalScore = 0;
-        }
-        
-        if (isCorrect) {
-            totalScore++;
-        }
-        session.setAttribute("totalScore", totalScore);
-        
-        // Move to next question or finish quiz
-        currentQuestionIndex++;
-        session.setAttribute("currentQuestionIndex", currentQuestionIndex);
-        
-        if (currentQuestionIndex < quizQuestions.size()) {
-            // Continue to next question
-            response.sendRedirect("quiz.jsp");
-        } else {
-            // Finish quiz
-            quizDAO.completeQuizHistory(historyId);
             
-            // Record final score
-            Score score = new Score();
-            score.setUserId(user.getUserId());
-            score.setHistoryId(historyId);
-            score.setTotalScore(totalScore);
-            score.setSubjectId(subjectId);
+            // Create and save answer
+            QuizAnswer answer = new QuizAnswer();
+            answer.setHistoryId(history.getHistoryId());
+            answer.setQuestionId(currentQuestion.getQuestionId());
+            answer.setSelectedOptionId(selectedOptionId);
+            answer.setCorrect(isCorrect);
             
-            ScoreDAO scoreDAO = new ScoreDAO();
-            scoreDAO.recordScore(score);
+            QuizHistoryDAO historyDAO = new QuizHistoryDAO();
+            historyDAO.addQuizAnswer(answer);
             
-            // Add chart data
-            float percentageScore = (float) totalScore / quizQuestions.size() * 100;
-            String subjectName = quizQuestions.get(0).getSubjectName();
-            scoreDAO.addChartData(user.getUserId(), subjectId, "performance", percentageScore, 
-                                  subjectName + " Performance");
+            // Add to session
+            selectedAnswers.add(answer);
+            session.setAttribute("selectedAnswers", selectedAnswers);
             
-            // Clear session attributes no longer needed
-            session.removeAttribute("quizQuestions");
-            session.removeAttribute("currentQuestionIndex");
-            session.removeAttribute("totalScore");
+            // Move to next question or end quiz
+            currentIndex++;
+            session.setAttribute("currentQuestionIndex", currentIndex);
             
-            // Redirect to result page
-            response.sendRedirect("result.jsp?score=" + totalScore + "&total=" + quizQuestions.size());
+            if (currentIndex < questions.size()) {
+                response.sendRedirect("QuizQuestion.jsp");
+            } else {
+                // End quiz
+                historyDAO.endQuizHistory(history.getHistoryId());
+                
+                // Calculate score
+                int correctCount = 0;
+                for (QuizAnswer ans : selectedAnswers) {
+                    if (ans.isCorrect()) {
+                        correctCount++;
+                    }
+                }
+                
+                // Save score
+                Score score = new Score();
+                score.setUserId(user.getUserId());
+                score.setHistoryId(history.getHistoryId());
+                score.setTotalScore(correctCount);
+                if (!questions.isEmpty()) {
+                    score.setSubjectId(questions.get(0).getSubjectId());
+                }
+                
+                ScoreDAO scoreDAO = new ScoreDAO();
+                scoreDAO.createScore(score);
+                
+                // Update chart data
+                ChartDataDAO chartDataDAO = new ChartDataDAO();
+                chartDataDAO.generatePerformanceData(user.getUserId());
+                
+                // Redirect to result page
+                response.sendRedirect("QuizResult.jsp");
+            }
         }
     }
 }
