@@ -9,7 +9,7 @@ import java.util.List;
 
 public class SubjectDAO {
     
-    // Create a new subject
+    // Add subject with better error handling
     public boolean addSubject(Subject subject) {
         String sql = "INSERT INTO subjects (subject_name, description) VALUES (?, ?)";
         
@@ -20,7 +20,6 @@ public class SubjectDAO {
             pstmt.setString(2, subject.getDescription());
             
             int affectedRows = pstmt.executeUpdate();
-            
             if (affectedRows > 0) {
                 try (ResultSet generatedKeys = pstmt.getGeneratedKeys()) {
                     if (generatedKeys.next()) {
@@ -30,13 +29,18 @@ public class SubjectDAO {
                 }
             }
         } catch (SQLException e) {
+            if (e.getErrorCode() == 1062) { // MySQL duplicate entry
+                System.err.println("Subject name already exists: " + subject.getSubjectName());
+            } else {
+                System.err.println("Error adding subject: " + e.getMessage());
+            }
             e.printStackTrace();
         }
         
         return false;
     }
     
-    // Get subject by ID
+    // Get subject by ID with better error handling
     public Subject getSubjectById(int subjectId) {
         String sql = "SELECT * FROM subjects WHERE subject_id = ?";
         
@@ -55,36 +59,39 @@ public class SubjectDAO {
                 }
             }
         } catch (SQLException e) {
+            System.err.println("Error getting subject with ID " + subjectId + ": " + e.getMessage());
             e.printStackTrace();
         }
         
         return null;
     }
     
-    // Get all subjects
+    // Get all subjects with better error handling
     public List<Subject> getAllSubjects() {
         List<Subject> subjects = new ArrayList<>();
-        String sql = "SELECT * FROM subjects";
+        String sql = "SELECT * FROM subjects ORDER BY subject_name";
         
         try (Connection conn = DBConnection.getConnection();
-             Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery(sql)) {
+             PreparedStatement pstmt = conn.prepareStatement(sql)) {
             
-            while (rs.next()) {
-                Subject subject = new Subject();
-                subject.setSubjectId(rs.getInt("subject_id"));
-                subject.setSubjectName(rs.getString("subject_name"));
-                subject.setDescription(rs.getString("description"));
-                subjects.add(subject);
+            try (ResultSet rs = pstmt.executeQuery()) {
+                while (rs.next()) {
+                    Subject subject = new Subject();
+                    subject.setSubjectId(rs.getInt("subject_id"));
+                    subject.setSubjectName(rs.getString("subject_name"));
+                    subject.setDescription(rs.getString("description"));
+                    subjects.add(subject);
+                }
             }
         } catch (SQLException e) {
+            System.err.println("Error getting subjects: " + e.getMessage());
             e.printStackTrace();
         }
         
         return subjects;
     }
     
-    // Update subject
+    // Update subject with better error handling
     public boolean updateSubject(Subject subject) {
         String sql = "UPDATE subjects SET subject_name = ?, description = ? WHERE subject_id = ?";
         
@@ -98,13 +105,18 @@ public class SubjectDAO {
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
         } catch (SQLException e) {
+            if (e.getErrorCode() == 1062) { // MySQL duplicate entry
+                System.err.println("Subject name already exists: " + subject.getSubjectName());
+            } else {
+                System.err.println("Error updating subject: " + e.getMessage());
+            }
             e.printStackTrace();
         }
         
         return false;
     }
     
-    // Delete subject
+    // Delete subject with better error handling
     public boolean deleteSubject(int subjectId) {
         String sql = "DELETE FROM subjects WHERE subject_id = ?";
         
@@ -116,8 +128,14 @@ public class SubjectDAO {
             int affectedRows = pstmt.executeUpdate();
             return affectedRows > 0;
         } catch (SQLException e) {
+            if (e.getErrorCode() == 1451) { // MySQL foreign key constraint
+                System.err.println("Cannot delete subject because it has related questions");
+            } else {
+                System.err.println("Error deleting subject: " + e.getMessage());
+            }
             e.printStackTrace();
         }
         
         return false;
     }
+}
