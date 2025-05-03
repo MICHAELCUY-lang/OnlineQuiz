@@ -336,7 +336,7 @@
                             <%
                                 try {
                                     // Database connection
-                                    Class.forName("com.mysql.jdbc.Driver");
+                                    Class.forName("com.mysql.cj.jdbc.Driver");
                                     conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/quiz_db", "root", "");
                                     
                                     // Get subjects

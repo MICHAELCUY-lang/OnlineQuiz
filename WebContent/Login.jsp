@@ -106,7 +106,10 @@
             try {
                 // Database connection
                 Class.forName("com.mysql.cj.jdbc.Driver");
-                conn = DriverManager.getConnection("jdbc:mysql://localhost:3306/quiz_db", "root", "");
+                conn = DriverManager.getConnection(
+                    "jdbc:mysql://localhost:3306/quiz_db?useSSL=false&serverTimezone=UTC", 
+                    "root", 
+                    "");
                 
                 // Validate login
                 pstmt = conn.prepareStatement("SELECT user_id, is_teacher FROM users WHERE username = ? AND password = ?");
