@@ -1,0 +1,19 @@
+<project name="OnlineQuiz" default="war" basedir=".">
+    <target name="compile">
+        <mkdir dir="build/classes"/>
+        <javac srcdir="src" destdir="build/classes" includeantruntime="false">
+            <classpath>
+                <fileset dir="lib">
+                    <include name="**/*.jar"/>
+                </fileset>
+            </classpath>
+        </javac>
+    </target>
+
+    <target name="war" depends="compile">
+        <war destfile="dist/OnlineQuiz.war" webxml="WebContent/WEB-INF/web.xml">
+            <fileset dir="WebContent"/>
+            <classes dir="build/classes"/>
+        </war>
+    </target>
+</project>
